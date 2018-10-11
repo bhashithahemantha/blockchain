@@ -1,4 +1,5 @@
-# Initializing our (empty) blockchain list
+import functools
+
 MINING_REWARD = 10 # reward for miners to add coins to the system
 
 
@@ -92,17 +93,16 @@ def get_balance(participant):
     tx_sender = [[tx['amount'] for tx in block['transactions']if tx['sender'] == participant] for block in blockchain]
     open_tx_sender = [tx['amount'] for tx in open_transactions if tx['sender'] == participant]
     tx_sender.append(open_tx_sender)
-    amount_sent = 0
-    for tx in tx_sender:
-        if len(tx) > 0:
-            amount_sent += tx[0]
+    # reduce list of amount to one number only using reduce()
+    # returns tx_sum at the end
+    # lambda function will add all the items together tx_sender list, starting from first one / [0]
+    amount_sent = functools.reduce(lambda tx_sum, tx_amt: tx_sum + sum(tx_amt) if len(tx_amt) > 0 else tx_sum + 0, tx_sender, 0)
 
+    # fetch recieved coin amout of transactionsthat were already in blocks of the blockchain
+    # we ignore open transactions here because you shuldn't be able to spend coins before the transaction is confirmed 
     tx_recipient = [[tx['amount'] for tx in block['transactions']if tx['recipient'] == participant] for block in blockchain]
-    amount_recieved = 0
-    for tx in tx_recipient:
-        if len(tx) > 0:
-            amount_recieved += tx[0]
-
+    amount_recieved = functools.reduce(lambda tx_sum, tx_amt: tx_sum + sum(tx_amt) if len(tx_amt) > 0 else tx_sum + 0, tx_recipient, 0)
+    # return total balance
     return amount_recieved - amount_sent
 
 def verify_chain():
@@ -164,7 +164,7 @@ while waiting_for_input:
         print('Invalid blockchain')
         # breakout of the loop
         break
-    print(get_balance('bhashi'))    
+    print('Balance of {}: {:6.2f}.'.format('bhashi',get_balance('bhashi')))    
 else:
     print('User left!')
 
