@@ -2,7 +2,7 @@ import functools
 
 MINING_REWARD = 10 # reward for miners to add coins to the system
 
-
+# genesis block
 genesis_block = {
         'previous_hash': '',
         'index': 0,
