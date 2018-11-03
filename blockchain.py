@@ -1,4 +1,7 @@
-import functools
+from functools import reduce
+import hashlib as h # to hashing the block
+import json # to create a string from block information
+from collections import OrderedDict
 
 MINING_REWARD = 10 # reward for miners to add coins to the system
 
@@ -6,7 +9,8 @@ MINING_REWARD = 10 # reward for miners to add coins to the system
 genesis_block = {
         'previous_hash': '',
         'index': 0,
-        'transactions': []
+        'transactions': [],
+        'proof': 100
 }
 blockchain = [genesis_block]
 open_transactions = [] # for outstanding transactions
@@ -30,11 +34,12 @@ def add_transaction(recipient, sender = owner, amount = 1.0):
             amount: amount of coins
     """
     # use dictionary
-    transaction = {
-        'sender': sender,
-        'recipient': recipient,
-        'amount': amount
-    }
+    # transaction = {
+    #     'sender': sender,
+    #     'recipient': recipient,
+    #     'amount': amount
+    # }
+    transaction = OrderedDict([('sender', sender), ('recipient', recipient), ('amount', amount)])
     if verify_transaction(transaction):
         open_transactions.append(transaction)
         participants.add(sender)
@@ -45,20 +50,25 @@ def add_transaction(recipient, sender = owner, amount = 1.0):
 
 def mine_block():
     """ Get open transactions and added to a new block which then added to the blockchain """
+    # fetch the last block of the chain and hash it
     last_block = blockchain[-1]
     hashed_block = hash_block(last_block)
+    # calculating the proof number
+    proof = proof_of_work()
     # reward for mining transaction
-    reward_transaction = {
-        'sender': 'MINING',
-        'recipient': owner,
-        'amount': MINING_REWARD
-    }
+    # reward_transaction = {
+    #     'sender': 'MINING',
+    #     'recipient': owner,
+    #     'amount': MINING_REWARD
+    # }
+    reward_transaction = OrderedDict([('sender', 'MINING'), ('recipient', owner), ('amount', MINING_REWARD)])
     copied_transactions = open_transactions[:] # make a copy of open transactions to manipulate list of transactions localy
     copied_transactions.append(reward_transaction)
     block = {
         'previous_hash': hashed_block,
         'index': len(blockchain),
-        'transactions': copied_transactions
+        'transactions': copied_transactions,
+        'proof': proof
     }
     blockchain.append(block)
     return True
@@ -86,7 +96,35 @@ def print_blockchain_elements():
 
  
 def hash_block(block):
-    return '-'.join([str(block[key]) for key in block])
+    """haches a block and returns a string representation of it
+    
+    Arguments: 
+        :block: the block that needs to be hashed.
+    """
+    # creating a string using block data and encode it to utf8 which can be used sha256. use hexdigest() to create a normal string
+    return h.sha256(json.dumps(block, sort_keys=True).encode()).hexdigest() # sort_keys to solve problem with the order change of the dictionary
+
+def valid_proof(transactions, last_hash, proof):
+    """genarate a hash and checks if it fulfil our defficulty criterias.
+    Arguments:
+        :transactions:  transactions of the new block to be generated.
+        :last_hash: hash of the previous block in the chain.
+        :proof: proof number, we'll call this function for every number that we are checking"""
+    # if we use for same trans and last_hash while incrementing proof number, we can get totaly defferent guess_hash and check for our requirements    
+    guess = (str(transactions) + str(last_hash) + str(proof)).encode() # encode to utf8
+    guess_hash = h.sha256(guess).hexdigest() # 
+    print(guess_hash)
+    return guess_hash[0: 2] == "00" # checking the hash fulfil our criterias
+
+def proof_of_work():
+    """loop to increment proof number"""
+    last_block = blockchain[-1] # last block of the blockchain
+    last_hash = hash_block(last_block)
+    proof = 0
+    # this will run until valid_proof returns true, which is solves our puzzle. then we know what our valid_proof is
+    while not valid_proof(open_transactions, last_hash, proof):
+        proof += 1
+    return proof # this number will leads to a hash, which solves our requierement
 
 def get_balance(participant):
     # nested list comprehension
@@ -96,12 +134,12 @@ def get_balance(participant):
     # reduce list of amount to one number only using reduce()
     # returns tx_sum at the end
     # lambda function will add all the items together tx_sender list, starting from first one / [0]
-    amount_sent = functools.reduce(lambda tx_sum, tx_amt: tx_sum + sum(tx_amt) if len(tx_amt) > 0 else tx_sum + 0, tx_sender, 0)
+    amount_sent = reduce(lambda tx_sum, tx_amt: tx_sum + sum(tx_amt) if len(tx_amt) > 0 else tx_sum + 0, tx_sender, 0)
 
     # fetch recieved coin amout of transactionsthat were already in blocks of the blockchain
     # we ignore open transactions here because you shuldn't be able to spend coins before the transaction is confirmed 
     tx_recipient = [[tx['amount'] for tx in block['transactions']if tx['recipient'] == participant] for block in blockchain]
-    amount_recieved = functools.reduce(lambda tx_sum, tx_amt: tx_sum + sum(tx_amt) if len(tx_amt) > 0 else tx_sum + 0, tx_recipient, 0)
+    amount_recieved = reduce(lambda tx_sum, tx_amt: tx_sum + sum(tx_amt) if len(tx_amt) > 0 else tx_sum + 0, tx_recipient, 0)
     # return total balance
     return amount_recieved - amount_sent
 
@@ -111,6 +149,8 @@ def verify_chain():
         if index == 0:
             continue
         if block['previous_hash'] != hash_block(blockchain[index - 1]):
+            return False
+        if not valid_proof(block['transactions'][:-1], block['previous_hash'], block['proof']):
             return False
     return True   
 
