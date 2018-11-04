@@ -6,17 +6,11 @@ import pickle # to convert python data to binary data, store it in a file and re
 
 MINING_REWARD = 10 # reward for miners to add coins to the system
 
-# starting genesis block
-genesis_block = {
-        'previous_hash': '',
-        'index': 0,
-        'transactions': [],
-        'proof': 100
-}
 # initializing empty blockchain
-blockchain = [genesis_block]
+blockchain = []
 # for stioring the outstanding transactions
 open_transactions = [] 
+
 # identifier of the owner of the blokcchain
 owner = 'bhashi'
 # registered participants. ourself and other sending/recieving users
@@ -27,62 +21,77 @@ def load_data():
     """ loads data from the text file when restarts the script. should load them as orderedDict.
     because when we are addin a trans, we add as orderedDict.
     we should also do the same when load fro the txt."""
-    with open('blockchain.txt', mode='r') as f: # rb - read binary
-        # file_content = pickle.loads(f.read())
 
-        file_content = f.readlines()
-        global blockchain
-        global open_transactions
+    global blockchain
+    global open_transactions
+    try:
+        with open('blockchain.txt', mode='r') as f: # rb - read binary
+            # file_content = pickle.loads(f.read())
+            file_content = f.readlines()
+            # blockchain = file_content['blockchain']
+            # open_transactions = file_content['open_transactions']
+            blockchain = json.loads(file_content[0][:-1]) # desirializing string in to a native python object, excepts \n
+            # should override the blockchain to match with orderedDict
+            updated_blockchain =[]
+            for block in blockchain:
+                updated_block = {
+                    'previous_hash': block['previous_hash'],
+                    'index': block['index'],
+                    'transactions': [OrderedDict([ # creating the orderedDict with transactions
+                                                    ('sender', tx['sender']), 
+                                                    ('recipient', tx ['recipient']), 
+                                                    ('amount', tx ['amount'])
+                                                ]) for tx in block['transactions']],
+                    'proof': block['proof']
+                }
+                updated_blockchain.append(updated_block)
+            blockchain = updated_blockchain
 
-        # blockchain = file_content['blockchain']
-        # open_transactions = file_content['open_transactions']
+            open_transactions = json.loads(file_content[1])
+            updated_transactions = []
+            for tx in open_transactions:
+                updated_tx = OrderedDict([
+                                    ('sender', tx['sender']), 
+                                    ('recipient', tx['recipient']), 
+                                    ('amount', tx['amount'])
+                                ])
+                updated_transactions.append(updated_tx)
+            open_transactions = updated_transactions   
+    except IOError:
+        # if can't load data from a file, initialize the chain with genesis block 
+        # starting genesis block
+        genesis_block = {
+                'previous_hash': '',
+                'index': 0,
+                'transactions': [],
+                'proof': 100
+        }
+        # initializing empty blockchain
+        blockchain = [genesis_block]
+        # for stioring the outstanding transactions
+        open_transactions = [] 
 
-        blockchain = json.loads(file_content[0][:-1]) # desirializing string in to a native python object, excepts \n
-        # should override the blockchain to match with orderedDict
-        updated_blockchain =[]
-        for block in blockchain:
-            updated_block = {
-                'previous_hash': block['previous_hash'],
-                'index': block['index'],
-                'transactions': [OrderedDict([ # creating the orderedDict with transactions
-                                                ('sender', tx['sender']), 
-                                                ('recipient', tx ['recipient']), 
-                                                ('amount', tx ['amount'])
-                                            ]) for tx in block['transactions']],
-                'proof': block['proof']
-            }
-            updated_blockchain.append(updated_block)
-        blockchain = updated_blockchain
-
-        open_transactions = json.loads(file_content[1])
-        updated_transactions = []
-        for tx in open_transactions:
-            updated_tx = OrderedDict([
-                                ('sender', tx['sender']), 
-                                ('recipient', tx['recipient']), 
-                                ('amount', tx['amount'])
-                            ])
-            updated_transactions.append(updated_tx)
-        open_transactions = updated_transactions    
-
-# load_data()
+load_data()
 
 # to save data in to a file
 def save_data():
     """save blockchain and open transactions in to a file.
        this will be calle dwhen we are adding a new transaction or adding a new block.
        those are the two ops that chain changes."""
-    with open('blockchain.txt', mode='w') as f: # w - write string, wb - write binary data
-        f.write(json.dumps(blockchain)) # convert/serialize blockchain list item in to a string and write it
-        f.write('\n')
-        f.write(json.dumps(open_transactions)) # convert/serialize open_transaction list toa string and write to the file
-        
-        # # create dictionary for pickling, pickling keep their structure 
-        # save_data = {
-        #     'blockchain': blockchain,
-        #     'open_transactions': open_transactions
-        # }
-        # f.write(pickle.dumps(save_data))
+    try:   
+        with open('blockchain.txt', mode='w') as f: # w - write string, wb - write binary data
+            f.write(json.dumps(blockchain)) # convert/serialize blockchain list item in to a string and write it
+            f.write('\n')
+            f.write(json.dumps(open_transactions)) # convert/serialize open_transaction list toa string and write to the file
+            
+            # # create dictionary for pickling, pickling keep their structure 
+            # save_data = {
+            #     'blockchain': blockchain,
+            #     'open_transactions': open_transactions
+            # }
+            # f.write(pickle.dumps(save_data))
+    except IOError:
+        print('saving failed!')
 
 def get_last_blockchain_value():
     """ Returns the last blockchain value."""
