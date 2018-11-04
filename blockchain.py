@@ -2,21 +2,87 @@ from functools import reduce
 import hashlib as h # to hashing the block
 import json # to create a string from block information
 from collections import OrderedDict
+import pickle # to convert python data to binary data, store it in a file and reconvert it
 
 MINING_REWARD = 10 # reward for miners to add coins to the system
 
-# genesis block
+# starting genesis block
 genesis_block = {
         'previous_hash': '',
         'index': 0,
         'transactions': [],
         'proof': 100
 }
+# initializing empty blockchain
 blockchain = [genesis_block]
-open_transactions = [] # for outstanding transactions
+# for stioring the outstanding transactions
+open_transactions = [] 
+# identifier of the owner of the blokcchain
 owner = 'bhashi'
+# registered participants. ourself and other sending/recieving users
 participants = {'bhashi'}
 
+# to load data from a file
+def load_data():
+    """ loads data from the text file when restarts the script. should load them as orderedDict.
+    because when we are addin a trans, we add as orderedDict.
+    we should also do the same when load fro the txt."""
+    with open('blockchain.txt', mode='r') as f: # rb - read binary
+        # file_content = pickle.loads(f.read())
+
+        file_content = f.readlines()
+        global blockchain
+        global open_transactions
+
+        # blockchain = file_content['blockchain']
+        # open_transactions = file_content['open_transactions']
+
+        blockchain = json.loads(file_content[0][:-1]) # desirializing string in to a native python object, excepts \n
+        # should override the blockchain to match with orderedDict
+        updated_blockchain =[]
+        for block in blockchain:
+            updated_block = {
+                'previous_hash': block['previous_hash'],
+                'index': block['index'],
+                'transactions': [OrderedDict([ # creating the orderedDict with transactions
+                                                ('sender', tx['sender']), 
+                                                ('recipient', tx ['recipient']), 
+                                                ('amount', tx ['amount'])
+                                            ]) for tx in block['transactions']],
+                'proof': block['proof']
+            }
+            updated_blockchain.append(updated_block)
+        blockchain = updated_blockchain
+
+        open_transactions = json.loads(file_content[1])
+        updated_transactions = []
+        for tx in open_transactions:
+            updated_tx = OrderedDict([
+                                ('sender', tx['sender']), 
+                                ('recipient', tx['recipient']), 
+                                ('amount', tx['amount'])
+                            ])
+            updated_transactions.append(updated_tx)
+        open_transactions = updated_transactions    
+
+load_data()
+
+# to save data in to a file
+def save_data():
+    """save blockchain and open transactions in to a file.
+       this will be calle dwhen we are adding a new transaction or adding a new block.
+       those are the two ops that chain changes."""
+    with open('blockchain.txt', mode='w') as f: # w - write string, wb - write binary data
+        f.write(json.dumps(blockchain)) # convert/serialize blockchain list item in to a string and write it
+        f.write('\n')
+        f.write(json.dumps(open_transactions)) # convert/serialize open_transaction list toa string and write to the file
+        
+        # # create dictionary for pickling, pickling keep their structure 
+        # save_data = {
+        #     'blockchain': blockchain,
+        #     'open_transactions': open_transactions
+        # }
+        # f.write(pickle.dumps(save_data))
 
 def get_last_blockchain_value():
     """ Returns the last blockchain value."""
@@ -39,11 +105,17 @@ def add_transaction(recipient, sender = owner, amount = 1.0):
     #     'recipient': recipient,
     #     'amount': amount
     # }
-    transaction = OrderedDict([('sender', sender), ('recipient', recipient), ('amount', amount)])
+    transaction = OrderedDict([
+        ('sender', sender), 
+        ('recipient', recipient), 
+        ('amount', amount)
+    ])
     if verify_transaction(transaction):
         open_transactions.append(transaction)
         participants.add(sender)
         participants.add(recipient)
+        # to save blockchcain info
+        save_data()
         return True
     return False    
 
@@ -112,9 +184,11 @@ def valid_proof(transactions, last_hash, proof):
         :proof: proof number, we'll call this function for every number that we are checking"""
     # if we use for same trans and last_hash while incrementing proof number, we can get totaly defferent guess_hash and check for our requirements    
     guess = (str(transactions) + str(last_hash) + str(proof)).encode() # encode to utf8
-    guess_hash = h.sha256(guess).hexdigest() # 
-    print(guess_hash)
-    return guess_hash[0: 2] == "00" # checking the hash fulfil our criterias
+    # print(guess)
+    # hash the string
+    guess_hash = h.sha256(guess).hexdigest() 
+    # print(guess_hash)
+    return guess_hash[0: 2] == "00" # checking the hash fulfil our criterias. only hashes that start with '00' will be ok
 
 def proof_of_work():
     """loop to increment proof number"""
@@ -184,6 +258,8 @@ while waiting_for_input:
     elif user_choice == '2':
         if mine_block(): # if all the open blocks are mined, set open_transactions to []
             open_transactions = []
+            # to save blockchain info
+            save_data()
     elif user_choice == '3':
         print_blockchain_elements()
     elif user_choice == '4':
