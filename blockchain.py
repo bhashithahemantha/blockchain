@@ -65,7 +65,7 @@ def load_data():
             updated_transactions.append(updated_tx)
         open_transactions = updated_transactions    
 
-load_data()
+# load_data()
 
 # to save data in to a file
 def save_data():
@@ -184,10 +184,8 @@ def valid_proof(transactions, last_hash, proof):
         :proof: proof number, we'll call this function for every number that we are checking"""
     # if we use for same trans and last_hash while incrementing proof number, we can get totaly defferent guess_hash and check for our requirements    
     guess = (str(transactions) + str(last_hash) + str(proof)).encode() # encode to utf8
-    # print(guess)
     # hash the string
     guess_hash = h.sha256(guess).hexdigest() 
-    # print(guess_hash)
     return guess_hash[0: 2] == "00" # checking the hash fulfil our criterias. only hashes that start with '00' will be ok
 
 def proof_of_work():
